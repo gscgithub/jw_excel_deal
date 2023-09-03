@@ -7,8 +7,10 @@ public class TeamDataResult {
 
     //班组名称
     private String department;
-    //专业
+    //专业类别
     private String profession;
+    //单位名称
+    private String company;
     //总分
     private Double answerTotalScore;
     //平均分
@@ -75,6 +77,14 @@ public class TeamDataResult {
 
     public void setProfession(String profession) {
         this.profession = profession;
+    }
+
+    public String getCompany() {
+        return company;
+    }
+
+    public void setCompany(String company) {
+        this.company = company;
     }
 
     public Double getAnswerTotalScore() {
@@ -202,6 +212,7 @@ public class TeamDataResult {
         return "TeamDataResult{" +
                 "department='" + department + '\'' +
                 ", profession='" + profession + '\'' +
+                ", company='" + company + '\'' +
                 ", answerTotalScore=" + answerTotalScore +
                 ", answerAverageScore=" + answerAverageScore +
                 ", reportCardTotalScore=" + reportCardTotalScore +

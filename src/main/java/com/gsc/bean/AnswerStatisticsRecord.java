@@ -3,9 +3,9 @@ package com.gsc.bean;
 public class AnswerStatisticsRecord {
     //编号
     private Integer num;
-    //父部门
+    //父部门   单位
     private String parentDepartment;
-    //部门
+    //部门     班组
     private String department;
     //用户名
     private String userName;

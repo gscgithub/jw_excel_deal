@@ -20,19 +20,22 @@ public class DealExcel {
         Scanner sc = new Scanner(System.in);
         System.out.println("输入每日答题文件地址：");
         String answerStatisticsFile = sc.nextLine();
-//        String answerStatisticsFile = "C:\\Users\\guosc\\Desktop\\每日答题统计_20220306195636.xls";
+//        String answerStatisticsFile = "F:\\..学习资料\\自己做的\\佳旺\\统计考试积分2\\每日答题统计_04.25-05.25.xls";
         System.out.println("输入成绩单文件地址：");
         String reportCardFile = sc.nextLine();
-//        String reportCardFile = "C:\\Users\\guosc\\Desktop\\第五轮全员成绩单_20220303084234.xls";
+//        String reportCardFile = "F:\\..学习资料\\自己做的\\佳旺\\统计考试积分2\\成绩单试验.xls";
         System.out.println("输入附件文件地址：");
         String appendixFile = sc.nextLine();
-//        String appendixFile = "C:\\Users\\guosc\\Desktop\\附件：班组强技能劳动竞赛活动内容统计表（ 专业组别积分排名表 单位积分排名表）-1月.xls";
+//        String appendixFile = "F:\\..学习资料\\自己做的\\佳旺\\统计考试积分2\\附件3：竞赛活动内容统计表(5月).xls";
 
         Workbook answerStatisticsWb = readExcel(answerStatisticsFile);
         Workbook reportCardWb = readExcel(reportCardFile);
         Workbook appendixWb = readExcel(appendixFile);
         Map<String, TeamDataResult> teamDataResults = getDateFromWorkbook(answerStatisticsWb, reportCardWb, appendixWb);
+        //计算每日答题积分
         calcAnswerIntegralAndSort(teamDataResults);
+        //计算普考积分
+        rankByTotalScoreAndCalcIntegral(teamDataResults);
         dealAppendixWb(teamDataResults, appendixWb);
         writeWbToFile(appendixWb, appendixFile);
 
@@ -116,7 +119,7 @@ public class DealExcel {
             throw new RuntimeException("appendixWb is null");
         }
         Sheet sheet = null;
-        Row row = null;
+        org.apache.poi.ss.usermodel.Row row = null;
 
         //获取第一个sheet
         sheet = appendixWb.getSheetAt(0);
@@ -126,12 +129,12 @@ public class DealExcel {
         for (int i = 3; i < rownum; i++) {
             row = sheet.getRow(i);
             if(row !=null){
-                //普考：实考人数 5	 合格人数 6     合格率 7   满分人员 8   普考积分 9
-                //220kV雅布赖集控站
-                //220KV雅布赖集控站
+                //普考：实考人数 5	 合格人数 6     合格率 7    普考积分 8
                 String department = ((String) getCellFormatValue(row.getCell(3)));
+                String parentDepartment = ((String) getCellFormatValue(row.getCell(2)));
                 department = department.toUpperCase();
-                TeamDataResult teamDataResult = teamDataResults.get(department);
+                parentDepartment = parentDepartment.toUpperCase();
+                TeamDataResult teamDataResult = teamDataResults.get(parentDepartment + department);
                 if(teamDataResult == null) {
                     teamDataResult = new TeamDataResult(department);
                 }
@@ -144,23 +147,16 @@ public class DealExcel {
                 cell5.setCellValue(teamDataResult.getQualifiedNum());
                 Cell cell6 = row.getCell(6);
                 cell6.setCellValue(toTwoDecimalPlaces(teamDataResult.getQualifiedRate() * 100));
-                Cell cell7 = row.getCell(7);
-                cell7.setCellValue(teamDataResult.getFullMarkNames());
-                Cell cell8 = row.getCell(8);
+                Cell cell8 = row.getCell(7);
                 cell8.setCellValue(toOneDecimalPlaces(teamDataResult.getReportCordIntegral()));
-                Cell cell9 = row.createCell(9);
-                cell9.setCellValue(toTwoDecimalPlaces(teamDataResult.getReportCardAverageScore()));
-                Cell cell10 = row.createCell(10);
-                cell10.setCellValue(teamDataResult.getReportCordRank());
 
-                Cell cell16 = row.getCell(16);
+                Cell cell16 = row.getCell(8);
                 cell16.setCellValue(teamDataResult.getAnswerTotalScore());
-                Cell cell17 = row.getCell(17);
+                Cell cell17 = row.getCell(9);
                 cell17.setCellValue(teamDataResult.getAnswerAverageScore());
-                Cell cell18 = row.getCell(18);
+                Cell cell18 = row.getCell(10);
                 cell18.setCellValue(toThreeDecimalPlaces(teamDataResult.getAnswerIntegral()));
-                Cell cell19 = row.getCell(19);
-                cell19.setCellValue(teamDataResult.getAnswerRank());
+
             }
         }
 
@@ -192,7 +188,7 @@ public class DealExcel {
         String columns[] = {"序号","专业类别","单位名称","班组名称"};
         List<Map<String,String>> list = getListMapFromWorkbook(appendixWb,  columns);
         for (Map<String, String> appendixMap : list) {
-            TeamDataResult teamDataResult = teamDataResults.get(appendixMap.get("班组名称"));
+            TeamDataResult teamDataResult = teamDataResults.get(appendixMap.get("单位名称") + appendixMap.get("班组名称"));
             if(teamDataResult != null) {
                 teamDataResult.setProfession(appendixMap.get("专业类别"));
             }
@@ -205,7 +201,8 @@ public class DealExcel {
         List<Map<String,String>> list = getListMapFromWorkbook(reportCardWb, columns);
         for (int i = 0; i < list.size(); i++) {
             Map<String, String> reportCardMap = list.get(i);
-            if(StringUtils.isNumeric(MapUtils.getString(reportCardMap, "编号"))) {
+            String num = MapUtils.getString(reportCardMap, "编号");
+            if(StringUtils.isNotBlank(num) && StringUtils.isNumeric(num)) {
                 String smallRule1 = list.get(i).get("小规则");
                 String smallRule2 = list.get(i+1).get("小规则");
                 String smallRule3 = list.get(i+2).get("小规则");
@@ -228,8 +225,14 @@ public class DealExcel {
 
         for(ReportCardRecord reportCardRecord : reportCardRecords) {
             String department = reportCardRecord.getDepartment();
-            TeamDataResult teamDataResult = teamDataResultMaps.get(department);
-            teamDataResult.getReportCardRecords().add(reportCardRecord);
+            String parentDepartment = reportCardRecord.getParentDepartment();
+            if(parentDepartment.contains("/")) {
+                parentDepartment = parentDepartment.split("/")[1];
+            }
+            TeamDataResult teamDataResult = teamDataResultMaps.get(parentDepartment+department);
+            if(teamDataResult != null) {
+                teamDataResult.getReportCardRecords().add(reportCardRecord);
+            }
         }
 
         Scanner sc = new Scanner(System.in);
@@ -248,7 +251,7 @@ public class DealExcel {
         }
         List<TeamDataResult> teamDataResults = new ArrayList<>();
         teamDataResults.addAll(teamDataResultMaps.values());
-        rankByTotalScoreAndCalcIntegral(teamDataResults);
+//        rankByTotalScoreAndCalcIntegral(teamDataResults);
 
     }
 
@@ -265,6 +268,25 @@ public class DealExcel {
         }
         teamDataResult.setReportCardTotalScore(totalScore);
         teamDataResult.setReportCardAverageScore(averageScore);
+    }
+
+    private static void rankByTotalScoreAndCalcIntegral(Map<String, TeamDataResult> teamDataResults) {
+        Map<String, List<TeamDataResult>> professionMap = new HashMap<String, List<TeamDataResult>>();
+        for (TeamDataResult teamDataResult : teamDataResults.values()) {
+            if(teamDataResult.getProfession() == null) {
+                continue;
+            }
+            List<TeamDataResult> teamDataResultsForProfession = professionMap.get(teamDataResult.getProfession());
+            if(teamDataResultsForProfession == null) {
+                teamDataResultsForProfession = new ArrayList<>();
+                professionMap.put(teamDataResult.getProfession(), teamDataResultsForProfession);
+            }
+            teamDataResultsForProfession.add(teamDataResult);
+        }
+
+        for (List<TeamDataResult> t : professionMap.values()) {
+            rankByTotalScoreAndCalcIntegral(t);
+        }
     }
 
     private static void rankByTotalScoreAndCalcIntegral(List<TeamDataResult> teamDataResults) {
@@ -378,25 +400,29 @@ public class DealExcel {
     private static Map<String, TeamDataResult> getDateFromAnswerStatisticsWb(Workbook answerStatisticsWb) {
         Map<String, TeamDataResult> teamDataResults = new HashMap<>();
         String columns[] = {"编号","父部门","部门","用户名","姓名","年龄","应答题天数","实际答题天数","总分","平均分"};
-        List<Map<String,String>> list = getListMapFromWorkbook(answerStatisticsWb, columns);
+        List<Map<String,String>> answerStatisticsList = getListMapFromWorkbook(answerStatisticsWb, columns);
 
         //删除无效数据
-        for (Iterator<Map<String, String>> iterator = list.iterator(); iterator.hasNext(); ) {
+        for (Iterator<Map<String, String>> iterator = answerStatisticsList.iterator(); iterator.hasNext(); ) {
             Map<String, String> next = iterator.next();
             if(!StringUtils.isNumeric(MapUtils.getString(next, "编号")) || StringUtils.isEmpty(MapUtils.getString(next, "编号"))) {
                 iterator.remove();
             }
         }
 
-        for (Map<String,String> map : list) {
-            AnswerStatisticsRecord answerStatisticsRecord = convertAnswerStatisticsRecord(map);
+        for (Map<String,String> answerStatisticsMap : answerStatisticsList) {
+            AnswerStatisticsRecord answerStatisticsRecord = convertAnswerStatisticsRecord(answerStatisticsMap);
             String department = answerStatisticsRecord.getDepartment();
-            TeamDataResult teamDataResult = teamDataResults.get(department);
+            String parentDepartment = answerStatisticsRecord.getParentDepartment();
+            if(parentDepartment.contains("/")) {
+                parentDepartment = parentDepartment.split("/")[1];
+            }
+            TeamDataResult teamDataResult = teamDataResults.get(parentDepartment + department);
             if(teamDataResult == null) {
                 teamDataResult = new TeamDataResult(department);
             }
             teamDataResult.getAnswerStatisticsRecords().add(answerStatisticsRecord);
-            teamDataResults.put(department, teamDataResult);
+            teamDataResults.put(parentDepartment + department , teamDataResult);
         }
         calcAnswerStatisticsDate(teamDataResults);
         List<TeamDataResult> ts = new ArrayList<>();
